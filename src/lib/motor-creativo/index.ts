@@ -5,7 +5,7 @@
 export * from "./tipos";
 export { planificar, planificarCon, resolverAsignacion, obtenerModelo } from "./router";
 export { traducirGeneracion, traducirEscalado, estimarCostoImagen, presetMasCercano, proporcionMasCercana } from "./traductor";
-export { crearGeneracion, estimarSolicitud, procesarCompletada, manejarFallo, sincronizar, sincronizarPendientes, recibirWebhook } from "./generacion";
+export { crearGeneracion, reintentarGeneracion, solicitudDeFila, estimarSolicitud, procesarCompletada, manejarFallo, sincronizar, sincronizarPendientes, recibirWebhook } from "./generacion";
 export type { SolicitudGeneracion, FilaGeneracion, ArchivoRef } from "./generacion";
 export { escribirPrompt, escribirEdicion, evaluarImagen, guiaAntiIA } from "./director-arte";
 export { llamarEstructurado, llamarTexto, bloqueImagen } from "./claude";

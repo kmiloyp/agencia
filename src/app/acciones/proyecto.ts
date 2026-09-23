@@ -6,7 +6,7 @@ import { investigar } from "@/lib/agencia/investigacion";
 import { extraerUrls, leerSitios } from "@/lib/agencia/lectura-web";
 import { turnoRecepcion } from "@/lib/agencia/recepcion";
 import { analizarReferencia } from "@/lib/agencia/referencias";
-import { estimarMuestras, generarMuestras, proponerRutas } from "@/lib/agencia/rutas";
+import { estimarMockups, generarMockups, proponerRutas, registrarMockupExterno } from "@/lib/agencia/rutas";
 import { EsquemaBrief, type Brief, type TipoNuevo, type TurnoRecepcion } from "@/lib/agencia/esquemas";
 import { briefVigente } from "@/lib/agencia/datos";
 import { contextoSistema, contextoUsuario } from "@/lib/contexto";
@@ -14,7 +14,7 @@ import { env } from "@/lib/env";
 import { sincronizarPendientes, type EstadoPresupuesto } from "@/lib/motor-creativo";
 import { fallo, type Resultado } from "@/lib/resultado";
 
-const TIPOS_REFERENCIA = ["me_gusta", "no_me_gusta", "inspiracion", "activo_del_cliente"] as const;
+const TIPOS_REFERENCIA = ["me_gusta", "no_me_gusta", "inspiracion", "activo_del_cliente", "ya_visto"] as const;
 
 function rutaProyecto(id: string) {
   revalidatePath(`/proyectos/${id}`, "layout");
@@ -315,10 +315,10 @@ export async function omitirInvestigacion(proyectoId: string) {
 // ---------------------------------------------------------------------------
 // Rutas creativas
 // ---------------------------------------------------------------------------
-export async function pedirRutas(proyectoId: string): Promise<Resultado> {
+export async function pedirRutas(proyectoId: string, cantidad = 6): Promise<Resultado> {
   try {
     const ctx = await contextoUsuario();
-    await proponerRutas(ctx, proyectoId);
+    await proponerRutas(ctx, proyectoId, Math.min(8, Math.max(3, cantidad)));
     rutaProyecto(proyectoId);
     return { ok: true };
   } catch (e) {
@@ -326,10 +326,10 @@ export async function pedirRutas(proyectoId: string): Promise<Resultado> {
   }
 }
 
-export async function estimarLote(proyectoId: string): Promise<Resultado<{ imagenes: number; presupuesto: EstadoPresupuesto; modo: string }>> {
+export async function estimarLote(proyectoId: string, rutaIds: string[] | null = null): Promise<Resultado<{ imagenes: number; presupuesto: EstadoPresupuesto; modo: string }>> {
   try {
     const ctx = await contextoUsuario();
-    return { ok: true, datos: await estimarMuestras(ctx, proyectoId, env.presupuestoMensual()) };
+    return { ok: true, datos: await estimarMockups(ctx, proyectoId, env.presupuestoMensual(), rutaIds) };
   } catch (e) {
     return fallo(e);
   }
@@ -338,13 +338,26 @@ export async function estimarLote(proyectoId: string): Promise<Resultado<{ image
 export async function generarLote(
   proyectoId: string,
   confirmado: boolean,
+  rutaIds: string[] | null = null,
 ): Promise<Resultado<{ creadas: number } | { presupuesto: EstadoPresupuesto; requiereConfirmacion: true }>> {
   try {
     const ctx = await contextoUsuario();
-    const r = await generarMuestras(ctx, proyectoId, env.presupuestoMensual(), confirmado);
+    const r = await generarMockups(ctx, proyectoId, env.presupuestoMensual(), confirmado, rutaIds);
     rutaProyecto(proyectoId);
     if (!r.ok) return { ok: true, datos: { presupuesto: r.presupuesto, requiereConfirmacion: true } };
     return { ok: true, datos: { creadas: r.creadas } };
+  } catch (e) {
+    return fallo(e);
+  }
+}
+
+/** La imagen ya se subió desde el navegador al bucket generaciones. */
+export async function subirMockupExterno(proyectoId: string, rutaId: string, archivo: string, ancho: number, alto: number): Promise<Resultado> {
+  try {
+    const ctx = await contextoUsuario();
+    await registrarMockupExterno(ctx, proyectoId, rutaId, archivo, ancho, alto);
+    rutaProyecto(proyectoId);
+    return { ok: true };
   } catch (e) {
     return fallo(e);
   }
@@ -355,6 +368,19 @@ export async function elegirRuta(proyectoId: string, rutaId: string): Promise<Re
     const ctx = await contextoUsuario();
     await ctx.db.from("rutas_creativas").update({ estado: "elegida" }).eq("id", rutaId).eq("owner_id", ctx.ownerId);
     await ctx.db.from("proyectos").update({ estado: "produccion" }).eq("id", proyectoId).eq("owner_id", ctx.ownerId);
+    rutaProyecto(proyectoId);
+    return { ok: true };
+  } catch (e) {
+    return fallo(e);
+  }
+}
+
+/** Suelta la ruta elegida para volver a explorar (no borra imágenes). */
+export async function reabrirRutas(proyectoId: string): Promise<Resultado> {
+  try {
+    const ctx = await contextoUsuario();
+    await ctx.db.from("rutas_creativas").update({ estado: "propuesta" }).eq("proyecto_id", proyectoId).eq("owner_id", ctx.ownerId).eq("estado", "elegida");
+    await ctx.db.from("proyectos").update({ estado: "rutas" }).eq("id", proyectoId).eq("owner_id", ctx.ownerId).in("estado", ["produccion", "composicion"]);
     rutaProyecto(proyectoId);
     return { ok: true };
   } catch (e) {

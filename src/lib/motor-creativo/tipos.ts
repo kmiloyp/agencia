@@ -13,6 +13,7 @@ export const CASOS_USO = [
   "edicion",
   "escalado",
   "borrador_rapido",
+  "mockup",
 ] as const;
 export type ClaveCasoUso = (typeof CASOS_USO)[number];
 

@@ -63,20 +63,39 @@ export type AnalisisReferencia = z.infer<typeof EsquemaAnalisisReferencia>;
 
 export const CASOS_USO_RUTA = ["ilustracion", "fotorrealismo", "texto_en_imagen", "vector_logo", "borrador_rapido"] as const;
 
+/** Palancas creativas: cada ruta debe apoyarse en una distinta. */
+export const PALANCAS = {
+  oficio_del_cliente: "Metáfora tomada del proceso, la maquinaria o los materiales del negocio del cliente",
+  tipografica: "La tipografía es la imagen: letra monumental, recortada o compuesta como forma",
+  sistema_grafico: "Un patrón, retícula o módulo repetido que se vuelve identidad",
+  fotografia_de_material: "Fotografía real (macro, bodegón, textura) de un material u objeto",
+  dibujo_tecnico: "Lenguaje de plano, diagrama, ficha técnica o infografía",
+  bloque_de_color: "Composición de planos de color plano, contraste fuerte, sin efectos",
+  ilustracion_de_autor: "Ilustración con técnica humana concreta (grabado, gouache, risografía, collage)",
+  acabado_tactil: "La idea vive en el acabado: troquel, ventana, relieve, barniz, hot stamping",
+  prestamo_de_otra_industria: "Toma el código visual de otra disciplina (mapas, partituras, etiquetas de laboratorio, boletos)",
+  narrativa: "Cuenta una pequeña historia o escena en la que el cliente aparece de forma indirecta",
+} as const;
+export type Palanca = keyof typeof PALANCAS;
+const CLAVES_PALANCA = Object.keys(PALANCAS) as [Palanca, ...Palanca[]];
+
+const EsquemaRuta = z.object({
+  nombre: z.string().describe("Nombre corto y evocador, en español"),
+  palanca: z.enum(CLAVES_PALANCA),
+  metafora: z.string().describe("De qué parte del oficio del cliente sale la idea, en una frase"),
+  concepto: z.string().describe("Dos frases en español"),
+  evita: z.string().describe("Qué cliché o qué elemento de lo ya visto evita esta ruta, en una frase"),
+  paleta: z.array(z.string()).describe("3–5 colores hex"),
+  tipografias: z.array(z.string()).describe("2 familias de Google Fonts: titular y texto"),
+  mood: z.string(),
+  por_que_encaja: z.string(),
+  caso_uso: z.enum(CASOS_USO_RUTA).describe("Cómo se produciría el arte final sin texto"),
+  prompt_mockup: z.string().describe("Prompt en inglés, 120–220 palabras, para generar la propuesta completa (todas las caras) con logo adjunto y textos reales"),
+  prompt_arte: z.string().describe("Prompt en inglés para el arte de fondo SIN textos ni logo, para producción"),
+});
+
 export const EsquemaRutas = z.object({
-  rutas: z
-    .array(
-      z.object({
-        nombre: z.string(),
-        concepto: z.string().describe("Dos frases."),
-        paleta: z.array(z.string()).describe("4–5 colores hex"),
-        tipografias: z.array(z.string()).describe("2 familias de Google Fonts: titular y texto"),
-        mood: z.string(),
-        caso_uso: z.enum(CASOS_USO_RUTA),
-        por_que_encaja: z.string(),
-        prompts: z.array(z.string()).describe("Exactamente 2 prompts en inglés, uno por muestra, explorando dos ejecuciones de la misma ruta"),
-      }),
-    )
-    .describe("Exactamente 3 rutas realmente distintas entre sí"),
+  rutas: z.array(EsquemaRuta).describe("Rutas realmente distintas entre sí, cada una con una palanca diferente"),
 });
 export type RutasPropuestas = z.infer<typeof EsquemaRutas>;
+export type RutaPropuesta = z.infer<typeof EsquemaRuta>;

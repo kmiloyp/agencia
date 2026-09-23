@@ -7,12 +7,13 @@ import { AvisoError, Boton, Muestras, claseCampo } from "@/components/ui";
 import type { AnalisisReferencia } from "@/lib/agencia/esquemas";
 import { crearClienteNavegador } from "@/lib/supabase/navegador";
 
-type TipoRef = "me_gusta" | "no_me_gusta" | "inspiracion" | "activo_del_cliente";
+type TipoRef = "me_gusta" | "no_me_gusta" | "inspiracion" | "activo_del_cliente" | "ya_visto";
 const TIPOS: { valor: TipoRef; texto: string }[] = [
   { valor: "me_gusta", texto: "Me gusta" },
   { valor: "no_me_gusta", texto: "No me gusta" },
   { valor: "inspiracion", texto: "Inspiración" },
   { valor: "activo_del_cliente", texto: "Activo del cliente" },
+  { valor: "ya_visto", texto: "Ya visto (no repetir)" },
 ];
 
 export interface Referencia {
@@ -163,7 +164,7 @@ export function Referencias({ proyectoId, ownerId, iniciales, destacar }: { proy
       >
         <UploadSimple size={20} className="text-texto-2" />
         <span className="text-texto-2">Arrastra varias imágenes o haz clic</span>
-        <span className="text-xs text-texto-3">Lo que te gusta, lo que no, inspiración y logos del cliente</span>
+        <span className="text-xs text-texto-3">Lo que te gusta, lo que no, lo ya visto e inspiración, más los logos del cliente</span>
         <input ref={entrada} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files) agregar(e.target.files); e.target.value = ""; }} />
       </div>
 

@@ -7,6 +7,7 @@ const ETIQUETAS: Record<string, string> = {
   no_me_gusta: "al cliente NO le gusta esta referencia (sirve para saber qué evitar)",
   inspiracion: "es una referencia de inspiración",
   activo_del_cliente: "es un activo del cliente (p. ej. su logo) que debe respetarse",
+  ya_visto: "es una propuesta que el cliente YA VIO: identifica con precisión su metáfora, paleta, composición y recursos para que no se repitan",
 };
 
 export async function analizarReferencia(ctx: ContextoMotor, referenciaId: string) {

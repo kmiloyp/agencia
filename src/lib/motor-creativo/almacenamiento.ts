@@ -7,10 +7,24 @@ import { ErrorMotor, type ContextoMotor } from "./tipos";
 
 export type Bucket = "referencias" | "generaciones" | "entregas" | "personajes";
 
+/**
+ * Tipo real por el contenido (los proveedores a veces envían
+ * application/octet-stream, p. ej. los SVG de Recraft).
+ */
+export function tipoPorContenido(buffer: Buffer, declarado?: string | null): string {
+  const inicio = buffer.subarray(0, 512).toString("utf8").trimStart();
+  if (inicio.startsWith("<svg") || (inicio.startsWith("<?xml") && inicio.includes("<svg"))) return "image/svg+xml";
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) return "image/jpeg";
+  if (buffer.subarray(0, 4).toString() === "RIFF" && buffer.subarray(8, 12).toString() === "WEBP") return "image/webp";
+  return declarado && declarado.startsWith("image/") ? declarado : "image/png";
+}
+
 export async function descargar(url: string): Promise<{ buffer: Buffer; tipo: string }> {
   const r = await fetch(url, { signal: AbortSignal.timeout(60_000) });
   if (!r.ok) throw new ErrorMotor(`No se pudo descargar la imagen generada (HTTP ${r.status}).`, "Reintenta la generación.");
-  return { buffer: Buffer.from(await r.arrayBuffer()), tipo: r.headers.get("content-type") ?? "image/png" };
+  const buffer = Buffer.from(await r.arrayBuffer());
+  return { buffer, tipo: tipoPorContenido(buffer, r.headers.get("content-type")) };
 }
 
 export async function guardar(ctx: ContextoMotor, bucket: Bucket, ruta: string, buffer: Buffer, tipo: string) {

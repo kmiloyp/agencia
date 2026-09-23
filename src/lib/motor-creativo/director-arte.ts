@@ -49,8 +49,8 @@ ${guia}`;
     e.brief ? `Brief: ${JSON.stringify(e.brief)}` : null,
     e.referencias && `Referencias del cliente: ${e.referencias}`,
     e.variacion && `Esta muestra debe explorar esta variación: ${e.variacion}`,
-    e.casoUso === "texto_en_imagen"
-      ? "Aquí el texto dentro de la imagen sí se permite: escríbelo entre comillas exactas."
+    e.casoUso === "texto_en_imagen" || e.casoUso === "mockup"
+      ? "Aquí el texto dentro de la imagen sí se permite: conserva los textos reales entre comillas exactas y pide reproducir el logo adjunto sin redibujarlo."
       : "La imagen NO debe contener texto, letras, números, logos ni marcas de agua: los textos van después como capas reales. Deja espacio negativo intencional para título y marca.",
   ]
     .filter(Boolean)
@@ -90,10 +90,12 @@ export async function evaluarImagen(
   const guia = await guiaAntiIA();
   const sistema = `Eres el director de arte y control de calidad de una agencia exigente. Revisas imágenes generadas antes de que lleguen al cliente. Eres severo pero justo: detectas lo que delata a la IA.
 
+Juzga la imagen por su propósito real, descrito en el contexto del encargo (por ejemplo, arte de fondo de una portada donde después se colocarán textos y logo reales). Los criterios del caso de uso son orientativos: no penalices que un arte de fondo no funcione como logotipo, ni que un vector plano no tenga textura de papel si no se pidió.
+
 ${guia}`;
   const texto = [
     `Caso de uso: ${a.casoUso}. Criterios: ${a.criterios.join("; ") || "calidad profesional"}.`,
-    a.casoUso === "texto_en_imagen" ? "En este caso el texto dentro de la imagen está permitido; revisa que esté bien escrito." : "La imagen NO debía llevar texto: cualquier texto o pseudo-letra es un hallazgo.",
+    a.casoUso === "texto_en_imagen" || a.casoUso === "mockup" ? "En este caso el texto dentro de la imagen está permitido; revisa que esté bien escrito." : "La imagen NO debía llevar texto: cualquier texto o pseudo-letra es un hallazgo.",
     a.contexto && `Contexto del encargo: ${a.contexto}`,
     `Prompt usado:\n${a.prompt}`,
     "Evalúa la imagen adjunta.",

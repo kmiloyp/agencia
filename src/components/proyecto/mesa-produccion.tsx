@@ -9,6 +9,7 @@ import { usd } from "@/lib/formato";
 import type { EstadoPresupuesto } from "@/lib/motor-creativo/costos";
 import { useGeneracionesEnVivo } from "./en-vivo";
 import { pendiente, TarjetaGeneracion, type Generacion } from "./generacion";
+import { AvisoFallidas } from "./reintento";
 
 export interface ModeloOpcion {
   id: string;
@@ -149,6 +150,9 @@ export function MesaProduccion({
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      {generaciones.some((g) => g.estado === "fallida") && (
+        <div className="xl:col-span-2"><AvisoFallidas proyectoId={proyectoId} fallidas={generaciones.filter((g) => g.estado === "fallida").length} /></div>
+      )}
       <section className="grid content-start gap-4 rounded-panel bg-escenario p-4 text-neutral-200 md:p-5">
         {generaciones.length === 0 ? (
           <div className="grid justify-items-start gap-3 py-6">
@@ -162,7 +166,7 @@ export function MesaProduccion({
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-4">
             {ordenadas.map((g) => (
               <div key={g.id} className={`rounded-control p-1 ${elegida?.id === g.id ? "ring-2 ring-acento" : ""}`}>
-                <TarjetaGeneracion g={g} proporcion={proporcion} alElegir={() => setSeleccion(g.id)} />
+                <TarjetaGeneracion g={g} proporcion={proporcion} alElegir={() => setSeleccion(g.id)} proyectoId={proyectoId} />
               </div>
             ))}
           </div>

@@ -1,7 +1,9 @@
 "use client";
-import { ThumbsDown, ThumbsUp, Warning, X } from "@phosphor-icons/react";
+import { ArrowClockwise, ThumbsDown, ThumbsUp, Warning, X } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { votarGeneracion } from "@/app/acciones/proyecto";
+import { reintentar } from "./reintento";
 import { usd } from "@/lib/formato";
 
 export interface Generacion {
@@ -73,7 +75,10 @@ function Detalle({ g, cerrar }: { g: Generacion; cerrar: () => void }) {
   );
 }
 
-export function TarjetaGeneracion({ g, proporcion, alElegir }: { g: Generacion; proporcion: number; alElegir?: () => void }) {
+export function TarjetaGeneracion({ g, proporcion, alElegir, proyectoId }: { g: Generacion; proporcion: number; alElegir?: () => void; proyectoId?: string }) {
+  const router = useRouter();
+  const [reintentando, iniciarReintento] = useTransition();
+  const [errorReintento, setErrorReintento] = useState<string | null>(null);
   const [abierta, setAbierta] = useState(false);
   const [voto, setVoto] = useState(g.voto);
   const [, iniciar] = useTransition();
@@ -91,7 +96,22 @@ export function TarjetaGeneracion({ g, proporcion, alElegir }: { g: Generacion; 
             <img src={g.url} alt="Muestra generada" className="h-full w-full object-cover" />
           </button>
         ) : g.estado === "fallida" ? (
-          <div className="grid h-full place-items-center p-4 text-center text-xs text-red-300">{g.error ?? "La generación falló."}</div>
+          <div className="grid h-full content-center justify-items-center gap-3 p-4 text-center text-xs text-red-300">
+            <span className="line-clamp-6">{errorReintento ?? g.error ?? "La generación falló."}</span>
+            {proyectoId && (
+              <button
+                disabled={reintentando}
+                onClick={() => iniciarReintento(async () => {
+                  const e = await reintentar(proyectoId, [g.id]);
+                  setErrorReintento(e ? e.error : null);
+                  router.refresh();
+                })}
+                className="inline-flex h-8 items-center gap-1.5 rounded-control bg-white/10 px-3 text-xs font-medium text-white hover:bg-white/15 disabled:opacity-50"
+              >
+                <ArrowClockwise size={14} />{reintentando ? "Reintentando…" : "Reintentar"}
+              </button>
+            )}
+          </div>
         ) : (
           <div className="absolute inset-0 animate-pulse bg-gradient-to-b from-escenario-2 to-escenario-borde" />
         )}

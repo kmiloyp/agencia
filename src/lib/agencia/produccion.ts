@@ -37,7 +37,7 @@ async function rutaElegida(ctx: ContextoMotor, proyectoId: string) {
     .eq("estado", "elegida")
     .maybeSingle();
   if (!data) throw new ErrorMotor("No hay ruta elegida.", "Elige una ruta en la pestaña Rutas.");
-  return data as { id: string; nombre: string; concepto: string; paleta: string[]; mood: string | null; tipografias: string[]; caso_uso: ClaveCasoUso; prompts: { muestras?: string[] } };
+  return data as { id: string; nombre: string; concepto: string; paleta: string[]; mood: string | null; tipografias: string[]; caso_uso: ClaveCasoUso; prompts: { muestras?: string[]; arte?: string } };
 }
 
 async function base(ctx: ContextoMotor, id: string): Promise<Base> {
@@ -64,7 +64,7 @@ async function solicitudes(ctx: ContextoMotor, proyectoId: string, a: AccionProd
   if (a.tipo === "muestras") {
     const proyecto = await cargarProyecto(ctx, proyectoId);
     const tam = tamanoGeneracion(proyecto.tipo_pieza?.formato);
-    const prompts = ruta.prompts?.muestras?.length ? ruta.prompts.muestras : [ruta.concepto];
+    const prompts = ruta.prompts?.arte ? [ruta.prompts.arte] : ruta.prompts?.muestras?.length ? ruta.prompts.muestras : [ruta.concepto];
     return Array.from({ length: a.cantidad }, (_, i) => ({
       proyectoId,
       rutaId: ruta.id,
@@ -77,6 +77,12 @@ async function solicitudes(ctx: ContextoMotor, proyectoId: string, a: AccionProd
   }
 
   const b = await base(ctx, a.base);
+  // Los mockups llevan el logo del cliente como referencia y no pasan por QC automático.
+  const esMockup = b.caso_uso === "mockup";
+  const logos = esMockup
+    ? ((await ctx.db.from("referencias").select("archivo").eq("proyecto_id", proyectoId).eq("owner_id", ctx.ownerId).eq("tipo", "activo_del_cliente").order("created_at").limit(3)).data ?? [])
+        .map((l) => ({ bucket: "referencias" as const, ruta: l.archivo as string }))
+    : [];
   const comun = {
     proyectoId,
     rutaId: b.ruta_id ?? ruta.id,
@@ -84,6 +90,7 @@ async function solicitudes(ctx: ContextoMotor, proyectoId: string, a: AccionProd
     parametros: { ancho_px: b.parametros.ancho_px, alto_px: b.parametros.alto_px },
     paleta: b.parametros.paleta ?? ruta.paleta,
     contextoQC: b.parametros.contexto_qc ?? contexto,
+    omitirQC: esMockup,
   };
 
   if (a.tipo === "variar") {
@@ -105,7 +112,7 @@ async function solicitudes(ctx: ContextoMotor, proyectoId: string, a: AccionProd
             )
           ).prompt
         : b.prompt;
-      lista.push({ ...comun, casoUso: b.caso_uso, prompt });
+      lista.push({ ...comun, casoUso: b.caso_uso, prompt, imagenesEntrada: logos });
     }
     return lista;
   }
@@ -119,7 +126,7 @@ async function solicitudes(ctx: ContextoMotor, proyectoId: string, a: AccionProd
   }
 
   // Mismo prompt con otro modelo elegido a mano (sin respaldo automático).
-  return [{ ...comun, casoUso: b.caso_uso, prompt: b.prompt, modeloId: a.modeloId }];
+  return [{ ...comun, casoUso: b.caso_uso, prompt: b.prompt, modeloId: a.modeloId, imagenesEntrada: logos }];
 }
 
 export async function estimarProduccion(ctx: ContextoMotor, proyectoId: string, a: AccionProduccion, presupuestoMensual: number) {

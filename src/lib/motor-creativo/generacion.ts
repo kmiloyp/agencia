@@ -33,6 +33,8 @@ export interface SolicitudGeneracion {
   /** Solo para el stub y el QC. */
   paleta?: string[];
   contextoQC?: string;
+  /** Borradores (mockups): se entregan sin control de calidad automático. */
+  omitirQC?: boolean;
 }
 
 export interface FilaGeneracion {
@@ -45,7 +47,7 @@ export interface FilaGeneracion {
   endpoint: string;
   uso_respaldo: boolean;
   prompt: string;
-  parametros: ParametrosGenericos & { paleta?: string[]; contexto_qc?: string; modelo_manual?: boolean; salida?: "images" | "image" };
+  parametros: ParametrosGenericos & { paleta?: string[]; contexto_qc?: string; modelo_manual?: boolean; salida?: "images" | "image"; omitir_qc?: boolean };
   imagenes_entrada: string[];
   fal_request_id: string | null;
   estado: string;
@@ -135,6 +137,7 @@ export async function crearGeneracion(ctx: ContextoMotor, s: SolicitudGeneracion
         contexto_qc: s.contextoQC,
         modelo_manual: !!s.modeloId,
         salida: plan.traduccion.salida,
+        omitir_qc: !!s.omitirQC,
       },
       entrada_fal: { ...plan.traduccion.entrada, ...(urls.length ? { _nota: "URLs de entrada firmadas por 3 h" } : {}) },
       imagenes_entrada: refs,
@@ -153,6 +156,51 @@ export async function crearGeneracion(ctx: ContextoMotor, s: SolicitudGeneracion
   } catch (e) {
     await manejarFallo(ctx, fila.id, e instanceof Error ? e.message : String(e));
     return (await obtenerFila(ctx, fila.id)) ?? fila;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reintento manual de una generación fallida (p. ej. tras recargar saldo)
+// ---------------------------------------------------------------------------
+export async function solicitudDeFila(ctx: ContextoMotor, generacionId: string): Promise<SolicitudGeneracion | null> {
+  const fila = await obtenerFila(ctx, generacionId);
+  if (!fila) return null;
+  return {
+    proyectoId: fila.proyecto_id,
+    rutaId: fila.ruta_id,
+    casoUso: fila.caso_uso,
+    prompt: fila.prompt,
+    parametros: fila.parametros,
+    imagenesEntrada: fila.imagenes_entrada.map(textoARef),
+    modeloId: fila.parametros.modelo_manual ? fila.modelo_id : undefined,
+    omitirQC: fila.parametros.omitir_qc,
+  };
+}
+
+export async function reintentarGeneracion(ctx: ContextoMotor, generacionId: string) {
+  const fila = await obtenerFila(ctx, generacionId);
+  if (!fila || fila.estado !== "fallida") return;
+  // Vuelve a empezar con el campeón (o el modelo elegido a mano), como si fuera nueva.
+  const modelo = fila.parametros.modelo_manual ? await obtenerModelo(ctx, fila.modelo_id) : (await resolverAsignacion(ctx, fila.caso_uso)).campeon;
+  const urls = await firmarEntradas(ctx, fila.imagenes_entrada);
+  const plan = planificarCon(modelo, fila.caso_uso, fila.prompt, { ...fila.parametros, imagenes_entrada: urls });
+  await actualizar(ctx, fila.id, {
+    modelo_id: modelo.id,
+    endpoint: plan.traduccion.endpoint,
+    entrada_fal: plan.traduccion.entrada,
+    estado: "en_cola",
+    error: null,
+    aviso: null,
+    uso_respaldo: false,
+    intentos: 0,
+    qc: null,
+    fal_request_id: null,
+  });
+  try {
+    const requestId = await enviarPlan(ctx, plan);
+    await actualizar(ctx, fila.id, { fal_request_id: requestId });
+  } catch (e) {
+    await manejarFallo(ctx, fila.id, e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -256,6 +304,10 @@ export async function procesarCompletada(ctx: ContextoMotor, generacionId: strin
   // 3. QC
   const umbrales = await ajustes(ctx);
   let qc: ResultadoQC;
+  if (fila.parametros.omitir_qc) {
+    await actualizar(ctx, fila.id, { estado: "lista" });
+    return;
+  }
   if (fila.caso_uso === "escalado") {
     // El escalado no cambia el contenido: se verifica solo que la resolución aumentó.
     const creció = ancho > fila.parametros.ancho_px;

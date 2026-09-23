@@ -100,6 +100,16 @@ src/
 - **Recepción:** conversación guardada en `mensajes` (tabla añadida a la especificación). El ejecutivo puede proponer plantillas nuevas; se crean solo con confirmación.
 - **Aprobación pública:** `aprobaciones.token_hash` guarda solo el hash del token; la página validará en servidor con service_role (nunca RLS público).
 
+## Enfoque: propuestas rápidas y divergentes (desde 2026-09-23)
+
+Decisión de Camilo tras comparar con ChatGPT: explorar con **mockups completos baratos** (todas las caras, logo y textos reales) y dejar composición/PDF solo para la ganadora. El valor de la app está en **inyectar creatividad**, no en vectorizar.
+
+- **Territorio agotado**: referencias tipo `ya_visto` (y `no_me_gusta`) → el director prohíbe repetir su metáfora, paleta y composición.
+- **Rutas** (`lib/agencia/rutas.ts`): dos pasadas. (1) Divergencia: `cantidad + 3` candidatas, cada una con una **palanca** distinta (`PALANCAS` en `esquemas.ts`) y una **metáfora del oficio del cliente** (no de los adjetivos del brief). (2) **Director crítico**: descarta clichés (ola = flexible, hoja = sostenible…) y lo parecido a lo ya visto, corrige prompts. Cada ruta guarda `palanca`, `metafora`, `evita` y `prompts.{mockup, arte}`.
+- **Mockup por ruta**, tres caminos: copiar el prompt para ChatGPT (gratis), generarlo aquí (caso de uso `mockup` → Nano Banana 2 con los logos del cliente como `image_urls`, ≈$0.08, sin QC) o subir la imagen externa (`registrarMockupExterno`, costo 0).
+- Producción puede variar/editar mockups (conservan texto y logo). `reabrirRutas` suelta la ruta elegida para volver a explorar.
+- Migración: `20260923000004_propuestas.sql`.
+
 ## Fase 2: cómo funciona
 
 - **Composición** (`lib/composicion/tipos.ts`): JSON por cara en `piezas.composicion`, todo en mm, origen = esquina superior izquierda del pliego con sangrado. Capas `imagen | texto | forma` con rotación horaria alrededor de su esquina superior izquierda (igual que Konva). `formatoDeCara` pone el margen de anillado en espejo en la contraportada.
